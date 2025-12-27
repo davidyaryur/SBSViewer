@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor 3D GLB - Slider Optimizado Móvil</title>
+    <title>Visor 3D GLB - Botón Smart 3D</title>
     
     <style>
         body {
@@ -14,7 +14,6 @@
             background-color: #000;
             font-family: sans-serif;
             overflow: hidden;
-            /* Evita el rebote de scroll en iOS */
             touch-action: none; 
         }
 
@@ -62,92 +61,65 @@
         body.sbs-active #hud-left { width: 50%; }
         body.sbs-active #hud-right { display: block; }
 
-        /* --- BOTONES --- */
+        /* --- BOTONES DE CONFIGURACIÓN (Abajo) --- */
         .control-btn {
             position: absolute;
             bottom: 20px;
-            padding: 12px 20px; /* Un poco más grandes */
+            padding: 12px 20px;
             background-color: rgba(51, 51, 51, 0.9);
             color: white;
             border: none;
             border-radius: 8px;
             font-weight: bold;
-            font-size: 16px; /* Texto más legible */
+            font-size: 16px;
             cursor: pointer;
             pointer-events: auto;
-            transition: opacity 0.3s;
         }
         .btn-fs { left: 20px; }
         .btn-sbs { right: 20px; }
 
 
-        /* --- NUEVO ESTILO: SLIDER GIGANTE --- */
-        .stereo-controls {
+        /* --- NUEVO BOTÓN 3D/2D (Botón Fantasma) --- */
+        .toggle-3d-btn {
             position: absolute;
-            top: 30px; 
+            top: 30px;
             left: 50%;
             transform: translateX(-50%);
-            width: 85%; /* Más ancho */
-            text-align: center;
-            pointer-events: auto; /* IMPORTANTE: Captura el clic */
-            opacity: 0; 
-            transition: opacity 0.5s;
             
-            /* Zona segura táctil */
-            padding: 20px 0; 
-            background: rgba(0,0,0,0.3); /* Fondo sutil para ver dónde tocar */
-            border-radius: 15px;
-        }
-
-        body.sbs-active .stereo-controls { opacity: 1; }
-
-        .stereo-label {
-            color: #fff;
-            font-size: 14px;
+            /* Estilo Transparente / Fantasma */
+            background: transparent; 
+            color: rgba(255, 255, 255, 0.5); /* Texto traslúcido */
+            border: 2px solid rgba(255, 255, 255, 0.3); /* Borde muy sutil */
+            
+            width: 60px;
+            height: 60px;
+            border-radius: 50%; /* Redondo */
+            
+            font-size: 18px;
             font-weight: bold;
-            margin-bottom: 10px;
-            text-shadow: 0px 2px 4px black;
-            display: block;
-            pointer-events: none; /* El texto no interfiere */
-        }
-
-        /* Estilo del Slider (Range) */
-        input[type=range] {
-            -webkit-appearance: none;
-            width: 90%;
-            background: transparent;
             cursor: pointer;
+            pointer-events: auto;
+            
+            /* Oculto por defecto, solo sale en SBS */
+            opacity: 0; 
+            pointer-events: none;
+            transition: all 0.3s ease;
+            
+            /* Centrar el texto */
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        /* --- CÍRCULO DEL DESLIZADOR (THUMB) --- */
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 35px;  /* MUCHO MÁS GRANDE */
-            width: 35px;   /* MUCHO MÁS GRANDE */
-            border-radius: 50%;
-            background: #007bff;
-            border: 3px solid white;
-            margin-top: -14px; /* Centrado vertical respecto a la barra */
-            box-shadow: 0 2px 6px rgba(0,0,0,0.5); /* Sombra para profundidad */
+        .toggle-3d-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
         }
 
-        /* --- BARRA DEL DESLIZADOR (TRACK) --- */
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 8px; /* BARRA MÁS GRUESA */
-            cursor: pointer;
-            background: rgba(255,255,255,0.3);
-            border-radius: 4px;
-            border: 1px solid rgba(0,0,0,0.5);
-        }
-
-        /* Firefox Support (por si acaso) */
-        input[type=range]::-moz-range-thumb {
-            height: 35px;
-            width: 35px;
-            border-radius: 50%;
-            background: #007bff;
-            border: 3px solid white;
+        /* Solo visible e interactuable cuando SBS está activo */
+        body.sbs-active .toggle-3d-btn {
+            opacity: 1;
+            pointer-events: auto;
         }
 
     </style>
@@ -179,20 +151,12 @@
     </div>
 
     <div id="hud-left" class="hud-container">
-        <div class="stereo-controls">
-            <span class="stereo-label">Ajuste 3D</span>
-            <input type="range" class="stereo-slider" min="0" max="6" step="0.1" value="0">
-        </div>
-        <button class="control-btn btn-fs">Pantalla Completa</button>
+        <button class="toggle-3d-btn">3D</button> <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
     <div id="hud-right" class="hud-container">
-        <div class="stereo-controls">
-            <span class="stereo-label">Ajuste 3D</span>
-            <input type="range" class="stereo-slider" min="0" max="6" step="0.1" value="0">
-        </div>
-        <button class="control-btn btn-fs">Pantalla Completa</button>
+        <button class="toggle-3d-btn">3D</button> <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
@@ -200,26 +164,18 @@
         const bodyElement = document.body;
         const viewerLeft = document.querySelector('#viewer-left');
         const viewerRight = document.querySelector('#viewer-right');
+        
         const sbsButtons = document.querySelectorAll('.btn-sbs');
         const fsButtons = document.querySelectorAll('.btn-fs');
-        const stereoSliders = document.querySelectorAll('.stereo-slider');
-        const stereoControlsDivs = document.querySelectorAll('.stereo-controls');
+        const toggle3dButtons = document.querySelectorAll('.toggle-3d-btn');
 
-        let currentStereoGap = 0;
+        // Estado del sistema
+        let currentStereoGap = 0; // Grados actuales de separación
+        let is3DActive = false;   // Estado lógico
+
         const degToRad = (deg) => deg * (Math.PI / 180);
 
-        // --- 1. BLOQUEO DE INTERFERENCIA TÁCTIL ---
-        // Esto es lo que evita que el modelo se mueva cuando tocas el slider
-        stereoControlsDivs.forEach(div => {
-            const stopPropagation = (e) => e.stopPropagation();
-            // Bloqueamos eventos táctiles y de mouse para que no lleguen al viewer
-            div.addEventListener('pointerdown', stopPropagation);
-            div.addEventListener('touchstart', stopPropagation);
-            div.addEventListener('touchmove', stopPropagation);
-            div.addEventListener('mousedown', stopPropagation);
-        });
-
-        // --- 2. SINCRONIZACIÓN 3D ---
+        // --- 1. SINCRONIZACIÓN VISUAL ---
         const syncViewers = (source, target, direction) => {
             const orbit = source.getCameraOrbit(); 
             const fieldOfView = source.getFieldOfView();
@@ -227,6 +183,7 @@
             const gapRad = degToRad(currentStereoGap);
 
             let newTheta = orbit.theta;
+            // Aplicamos la separación actual (sea 0, 1.5, o 3 grados según la animación)
             if (direction === 'LtoR') {
                 newTheta = orbit.theta + (gapRad * 2); 
             } else {
@@ -239,28 +196,65 @@
             target.jumpCameraToGoal();
         };
 
+        // Eventos de movimiento manual
         viewerLeft.addEventListener('camera-change', (event) => {
             if (event.detail.source === 'user-interaction') syncViewers(viewerLeft, viewerRight, 'LtoR');
         });
-
         viewerRight.addEventListener('camera-change', (event) => {
             if (event.detail.source === 'user-interaction') syncViewers(viewerRight, viewerLeft, 'RtoL');
         });
 
-        // --- 3. LÓGICA SLIDER ---
-        const updateStereoEffect = (value) => {
-            currentStereoGap = parseFloat(value);
-            stereoSliders.forEach(slider => slider.value = currentStereoGap);
-            syncViewers(viewerLeft, viewerRight, 'LtoR');
-        };
+        // --- 2. SISTEMA DE ANIMACIÓN (TWEENING) ---
+        
+        // Esta función mueve el valor de "currentStereoGap" de A a B suavemente
+        function animateGapChange(startValue, endValue, duration) {
+            const startTime = performance.now();
 
-        stereoSliders.forEach(slider => {
-            slider.addEventListener('input', (e) => updateStereoEffect(e.target.value));
-            // También prevenimos la propagación en el input directo por si acaso
-            slider.addEventListener('pointerdown', (e) => e.stopPropagation());
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Función Easing (Suavizado): easeInOutQuad
+                // Hace que empiece lento, acelere y termine lento
+                const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+                // Calcular valor intermedio
+                currentStereoGap = startValue + (endValue - startValue) * ease;
+
+                // Actualizar visualmente (Usamos Izquierda como maestro)
+                syncViewers(viewerLeft, viewerRight, 'LtoR');
+
+                if (progress < 1) {
+                    requestAnimationFrame(update); // Seguir animando
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+
+        // --- 3. LÓGICA BOTÓN 3D ---
+        toggle3dButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (!is3DActive) {
+                    // ACTIVAR 3D
+                    is3DActive = true;
+                    // Cambiar texto de TODOS los botones
+                    toggle3dButtons.forEach(b => b.textContent = "2D");
+                    // Animar de 0 a 3 grados en 1000ms (1 segundo)
+                    animateGapChange(0, 3, 1000);
+                } else {
+                    // DESACTIVAR 3D
+                    is3DActive = false;
+                    toggle3dButtons.forEach(b => b.textContent = "3D");
+                    // Animar de 3 a 0 grados en 1000ms
+                    animateGapChange(3, 0, 1000);
+                }
+            });
         });
 
-        // --- 4. BOTONES ---
+
+        // --- 4. CONFIGURACIÓN (SETUP) ---
         const hideButtons = (nodeList) => nodeList.forEach(btn => btn.style.display = 'none');
 
         sbsButtons.forEach(btn => {
