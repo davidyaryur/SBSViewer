@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor 3D GLB - UI Duplicada SBS</title>
+    <title>Visor 3D GLB - Inmersivo Final</title>
     
     <style>
         body {
@@ -11,7 +11,7 @@
             padding: 0;
             width: 100vw;
             height: 100vh;
-            background-color: #000;
+            background-color: #000; /* Fondo general negro */
             font-family: sans-serif;
             overflow: hidden;
         }
@@ -25,7 +25,8 @@
         model-viewer {
             width: 100%;
             height: 100%;
-            background-color: #f0f0f0;
+            /* CAMBIO: Fondo negro para el modelo */
+            background-color: #000; 
             outline: none; 
         }
 
@@ -44,44 +45,35 @@
             border-right: 1px solid #333;
         }
 
-        /* --- CAPAS DE INTERFAZ (HUD) --- */
+        /* --- HUD (Capas de interfaz) --- */
         .hud-container {
             position: absolute;
             top: 0;
             height: 100%;
-            pointer-events: none; /* Dejar pasar clics al modelo 3D */
+            pointer-events: none; 
             box-sizing: border-box;
             transition: width 0.3s;
         }
 
-        /* HUD Izquierdo (Default ocupa todo) */
         #hud-left {
             left: 0;
             width: 100%;
-            border-right: none; 
         }
 
-        /* HUD Derecho (Oculto por defecto) */
         #hud-right {
             left: 50%;
             width: 50%;
-            display: none; /* Oculto inicialmente */
+            display: none; 
         }
 
-        /* Cuando SBS está activo */
-        body.sbs-active #hud-left {
-            width: 50%;
-            border-right: 1px solid rgba(0,0,0,0.1);
-        }
-        body.sbs-active #hud-right {
-            display: block;
-        }
+        body.sbs-active #hud-left { width: 50%; }
+        body.sbs-active #hud-right { display: block; }
 
         /* --- BOTONES --- */
         .control-btn {
             position: absolute;
             bottom: 20px;
-            padding: 10px 16px; /* Un poco más pequeños para que quepan bien en mitades */
+            padding: 10px 16px;
             background-color: rgba(51, 51, 51, 0.9);
             color: white;
             border: none;
@@ -89,28 +81,16 @@
             font-weight: bold;
             font-size: 14px;
             cursor: pointer;
-            pointer-events: auto; /* Reactivar clics en botones */
-            transition: background-color 0.2s;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            white-space: nowrap;
+            pointer-events: auto;
+            transition: background-color 0.2s, opacity 0.3s; /* Animación para desaparecer */
         }
 
         .control-btn:hover {
-            background-color: #555;
-        }
-        
-        /* Estilo activo para botones SBS */
-        .btn-sbs.active {
-             background-color: #007bff;
+            background-color: #777;
         }
 
-        /* Posiciones relativas a su contenedor HUD */
-        .btn-fs {
-            left: 20px;
-        }
-        .btn-sbs {
-            right: 20px;
-        }
+        .btn-fs { left: 20px; }
+        .btn-sbs { right: 20px; }
 
     </style>
 
@@ -141,12 +121,12 @@
     </div>
 
     <div id="hud-left" class="hud-container">
-        <button class="control-btn btn-fs">Pantalla</button>
+        <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
     <div id="hud-right" class="hud-container">
-        <button class="control-btn btn-fs">Pantalla</button>
+        <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
@@ -154,20 +134,28 @@
         const bodyElement = document.body;
         const viewerLeft = document.querySelector('#viewer-left');
         const viewerRight = document.querySelector('#viewer-right');
-
-        // Seleccionamos TODOS los botones por clase, ya que ahora hay duplicados
         const sbsButtons = document.querySelectorAll('.btn-sbs');
         const fsButtons = document.querySelectorAll('.btn-fs');
 
-        // --- LÓGICA SINCRONIZACIÓN 3D ---
+        // --- LÓGICA DE SINCRONIZACIÓN COMPLETA (Orbita + Zoom + Paneo) ---
         const syncViewers = (source, target) => {
             const orbit = source.getCameraOrbit();
             const fieldOfView = source.getFieldOfView();
+            // NUEVO: Obtenemos el "Target" (hacia dónde mira la cámara, x,y,z) para el paneo
+            const targetPos = source.getCameraTarget();
+
+            // Aplicamos rotación
             target.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${orbit.radius}m`;
+            // Aplicamos zoom
             target.fieldOfView = `${fieldOfView}deg`;
+            // Aplicamos paneo (NUEVO)
+            target.cameraTarget = `${targetPos.x}m ${targetPos.y}m ${targetPos.z}m`;
+            
+            // Forzamos actualización inmediata
             target.jumpCameraToGoal();
         };
 
+        // Escuchas de eventos (solo si es interacción humana)
         viewerLeft.addEventListener('camera-change', (event) => {
             if (event.detail.source === 'user-interaction') syncViewers(viewerLeft, viewerRight);
         });
@@ -176,47 +164,45 @@
             if (event.detail.source === 'user-interaction') syncViewers(viewerRight, viewerLeft);
         });
 
-        // --- LÓGICA SBS (Aplica a todos los botones SBS) ---
-        sbsButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                bodyElement.classList.toggle('sbs-active');
-                const isActive = bodyElement.classList.contains('sbs-active');
+        // --- LÓGICA DE BOTONES (UN SOLO USO) ---
 
-                // Sincronizar al activar
-                if (isActive) syncViewers(viewerLeft, viewerRight);
-
-                // Actualizar TEXTO y ESTILO de AMBOS botones SBS
-                sbsButtons.forEach(b => {
-                    b.textContent = isActive ? 'Salir SBS' : 'Modo SBS';
-                    b.classList.toggle('active', isActive);
-                });
+        // Función para ocultar todos los botones de un tipo
+        const hideButtons = (nodeList) => {
+            nodeList.forEach(btn => {
+                btn.style.display = 'none';
             });
-        });
-
-        // --- LÓGICA PANTALLA COMPLETA (Aplica a todos los botones FS) ---
-        const toggleFullscreen = () => {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(e => console.error(e));
-            } else {
-                document.exitFullscreen();
-            }
         };
 
-        fsButtons.forEach(btn => {
-            btn.addEventListener('click', toggleFullscreen);
-        });
+        // Botones SBS
+        sbsButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Activamos SBS
+                bodyElement.classList.add('sbs-active');
+                
+                // Sincronizamos inmediatamente
+                syncViewers(viewerLeft, viewerRight);
 
-        // Detectar cambios globales de pantalla completa para actualizar textos
-        document.addEventListener('fullscreenchange', () => {
-            const isFull = !!document.fullscreenElement;
-            fsButtons.forEach(b => {
-                b.textContent = isFull ? 'Salir Pantalla' : 'Pantalla';
+                // Ocultamos TODOS los botones SBS (ya no se puede volver atrás)
+                hideButtons(sbsButtons);
             });
         });
 
-        // Sincronización inicial al cargar
+        // Botones Pantalla Completa
+        fsButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Activamos Fullscreen
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(e => console.error(e));
+                }
+                
+                // Ocultamos TODOS los botones de Pantalla Completa
+                hideButtons(fsButtons);
+            });
+        });
+
+        // Sincronización inicial de carga
         viewerLeft.addEventListener('load', () => syncViewers(viewerLeft, viewerRight));
-        
+
     </script>
 
 </body>
