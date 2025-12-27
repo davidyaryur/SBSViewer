@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor 3D GLB - Botón Smart 3D</title>
+    <title>Visor 3D GLB - Inmersión Total</title>
     
     <style>
         body {
@@ -36,7 +36,8 @@
             width: 50%;
             opacity: 1;
             pointer-events: auto;
-            border-right: 1px solid #333;
+            /* CAMBIO: Eliminada la línea divisoria (border-right) */
+            border: none; 
         }
 
         #viewer-right {
@@ -61,7 +62,7 @@
         body.sbs-active #hud-left { width: 50%; }
         body.sbs-active #hud-right { display: block; }
 
-        /* --- BOTONES DE CONFIGURACIÓN (Abajo) --- */
+        /* --- BOTONES DE CONFIGURACIÓN --- */
         .control-btn {
             position: absolute;
             bottom: 20px;
@@ -79,47 +80,31 @@
         .btn-sbs { right: 20px; }
 
 
-        /* --- NUEVO BOTÓN 3D/2D (Botón Fantasma) --- */
+        /* --- BOTÓN FANTASMA (Invisible pero funcional) --- */
         .toggle-3d-btn {
             position: absolute;
-            top: 30px;
+            top: 20px; 
             left: 50%;
             transform: translateX(-50%);
             
-            /* Estilo Transparente / Fantasma */
-            background: transparent; 
-            color: rgba(255, 255, 255, 0.5); /* Texto traslúcido */
-            border: 2px solid rgba(255, 255, 255, 0.3); /* Borde muy sutil */
+            width: 80px; /* Área de toque generosa */
+            height: 80px;
+            border-radius: 50%;
             
-            width: 60px;
-            height: 60px;
-            border-radius: 50%; /* Redondo */
+            /* CAMBIO: Totalmente invisible */
+            background: transparent;
+            border: none;
+            color: transparent;
+            opacity: 0; /* Invisible visualmente */
             
-            font-size: 18px;
-            font-weight: bold;
             cursor: pointer;
-            pointer-events: auto;
-            
-            /* Oculto por defecto, solo sale en SBS */
-            opacity: 0; 
-            pointer-events: none;
-            transition: all 0.3s ease;
-            
-            /* Centrar el texto */
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            pointer-events: none; /* Desactivado por defecto */
         }
 
-        .toggle-3d-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        /* Solo visible e interactuable cuando SBS está activo */
+        /* Solo activamos el área de clic cuando estamos en SBS */
         body.sbs-active .toggle-3d-btn {
-            opacity: 1;
-            pointer-events: auto;
+            pointer-events: auto; 
+            /* Nota: Mantenemos opacity 0 para que no se vea */
         }
 
     </style>
@@ -151,12 +136,12 @@
     </div>
 
     <div id="hud-left" class="hud-container">
-        <button class="toggle-3d-btn">3D</button> <button class="control-btn btn-fs">Pantalla Completa</button>
+        <button class="toggle-3d-btn">3D Toggle</button> <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
     <div id="hud-right" class="hud-container">
-        <button class="toggle-3d-btn">3D</button> <button class="control-btn btn-fs">Pantalla Completa</button>
+        <button class="toggle-3d-btn">3D Toggle</button> <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
@@ -170,12 +155,11 @@
         const toggle3dButtons = document.querySelectorAll('.toggle-3d-btn');
 
         // Estado del sistema
-        let currentStereoGap = 0; // Grados actuales de separación
-        let is3DActive = false;   // Estado lógico
-
+        let currentStereoGap = 0; // Grados totales de separación
+        let is3DActive = false;   
         const degToRad = (deg) => deg * (Math.PI / 180);
 
-        // --- 1. SINCRONIZACIÓN VISUAL ---
+        // --- 1. SINCRONIZACIÓN AL ARRASTRAR (User Interaction) ---
         const syncViewers = (source, target, direction) => {
             const orbit = source.getCameraOrbit(); 
             const fieldOfView = source.getFieldOfView();
@@ -183,11 +167,13 @@
             const gapRad = degToRad(currentStereoGap);
 
             let newTheta = orbit.theta;
-            // Aplicamos la separación actual (sea 0, 1.5, o 3 grados según la animación)
+            
+            // Si el usuario mueve un lado, el otro lado debe mantener la distancia TOTAL
+            // Si muevo la izquierda, la derecha está a -GAP de distancia
             if (direction === 'LtoR') {
-                newTheta = orbit.theta + (gapRad * 2); 
+                newTheta = orbit.theta - gapRad; 
             } else {
-                newTheta = orbit.theta - (gapRad * 2);
+                newTheta = orbit.theta + gapRad;
             }
 
             target.cameraOrbit = `${newTheta}rad ${orbit.phi}rad ${orbit.radius}m`;
@@ -196,7 +182,6 @@
             target.jumpCameraToGoal();
         };
 
-        // Eventos de movimiento manual
         viewerLeft.addEventListener('camera-change', (event) => {
             if (event.detail.source === 'user-interaction') syncViewers(viewerLeft, viewerRight, 'LtoR');
         });
@@ -204,62 +189,90 @@
             if (event.detail.source === 'user-interaction') syncViewers(viewerRight, viewerLeft, 'RtoL');
         });
 
-        // --- 2. SISTEMA DE ANIMACIÓN (TWEENING) ---
+        // --- 2. ANIMACIÓN SIMÉTRICA (El pivote central) ---
         
-        // Esta función mueve el valor de "currentStereoGap" de A a B suavemente
-        function animateGapChange(startValue, endValue, duration) {
+        function animateGapChange(startGap, endGap, duration) {
             const startTime = performance.now();
+            
+            // 1. CAPTURAMOS EL "CENTRO" ACTUAL
+            // Si el gap actual es 0, el centro es la cámara izquierda (o derecha, son iguales).
+            // Si el gap actual es 3, la cámara izquierda está desplazada +1.5 del centro.
+            // Formula: Centro = AnguloIzquierda - (GapActual / 2)
+            const currentLeftOrbit = viewerLeft.getCameraOrbit();
+            const currentOrbitData = {
+                phi: currentLeftOrbit.phi,
+                radius: currentLeftOrbit.radius,
+                target: viewerLeft.getCameraTarget(),
+                fov: viewerLeft.getFieldOfView()
+            };
+            
+            // Calculamos el ángulo central "puro" antes de empezar a movernos
+            const centerTheta = currentLeftOrbit.theta - degToRad(startGap / 2);
 
             function update(currentTime) {
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
-
-                // Función Easing (Suavizado): easeInOutQuad
-                // Hace que empiece lento, acelere y termine lento
+                
+                // Easing suave
                 const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-                // Calcular valor intermedio
-                currentStereoGap = startValue + (endValue - startValue) * ease;
+                // Calculamos el nuevo Gap total
+                currentStereoGap = startGap + (endGap - startGap) * ease;
+                
+                // Calculamos la mitad del gap (para mover cada ojo la mitad)
+                const halfGapRad = degToRad(currentStereoGap / 2);
 
-                // Actualizar visualmente (Usamos Izquierda como maestro)
-                syncViewers(viewerLeft, viewerRight, 'LtoR');
+                // --- MAGIA SIMÉTRICA ---
+                // Izquierda se mueve +1.5 (hacia un lado)
+                const leftTheta = centerTheta + halfGapRad;
+                // Derecha se mueve -1.5 (hacia el otro lado)
+                const rightTheta = centerTheta - halfGapRad;
+
+                // Aplicamos a AMBOS visores
+                viewerLeft.cameraOrbit = `${leftTheta}rad ${currentOrbitData.phi}rad ${currentOrbitData.radius}m`;
+                viewerRight.cameraOrbit = `${rightTheta}rad ${currentOrbitData.phi}rad ${currentOrbitData.radius}m`;
+                
+                // Aseguramos que el resto de parámetros no se pierdan
+                const camString = `${currentOrbitData.target.x}m ${currentOrbitData.target.y}m ${currentOrbitData.target.z}m`;
+                const fovString = `${currentOrbitData.fov}deg`;
+
+                viewerLeft.cameraTarget = camString;
+                viewerRight.cameraTarget = camString;
+                viewerLeft.fieldOfView = fovString;
+                viewerRight.fieldOfView = fovString;
+
+                viewerLeft.jumpCameraToGoal();
+                viewerRight.jumpCameraToGoal();
 
                 if (progress < 1) {
-                    requestAnimationFrame(update); // Seguir animando
+                    requestAnimationFrame(update);
                 }
             }
-
             requestAnimationFrame(update);
         }
 
-
-        // --- 3. LÓGICA BOTÓN 3D ---
+        // --- 3. LOGICA BOTÓN FANTASMA ---
         toggle3dButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 if (!is3DActive) {
-                    // ACTIVAR 3D
                     is3DActive = true;
-                    // Cambiar texto de TODOS los botones
-                    toggle3dButtons.forEach(b => b.textContent = "2D");
-                    // Animar de 0 a 3 grados en 1000ms (1 segundo)
+                    // Animamos de 0 a 3 grados (1.5 cada lado)
                     animateGapChange(0, 3, 1000);
                 } else {
-                    // DESACTIVAR 3D
                     is3DActive = false;
-                    toggle3dButtons.forEach(b => b.textContent = "3D");
-                    // Animar de 3 a 0 grados en 1000ms
+                    // Animamos de 3 a 0 grados
                     animateGapChange(3, 0, 1000);
                 }
             });
         });
 
-
-        // --- 4. CONFIGURACIÓN (SETUP) ---
+        // --- 4. SETUP ---
         const hideButtons = (nodeList) => nodeList.forEach(btn => btn.style.display = 'none');
 
         sbsButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 bodyElement.classList.add('sbs-active');
+                // Sincronización inicial (Gap 0)
                 syncViewers(viewerLeft, viewerRight, 'LtoR');
                 hideButtons(sbsButtons);
             });
