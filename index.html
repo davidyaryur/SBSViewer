@@ -217,12 +217,12 @@
     </div>
 
     <div id="hud-left" class="hud-container">
-        <button class="toggle-3d-btn" title="Toca aquí para efecto 3D"></button> 
+        <button class="toggle-3d-btn" title="Toca aquí para cambiar intensidad 3D"></button> 
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
     <div id="hud-right" class="hud-container">
-        <button class="toggle-3d-btn" title="Toca aquí para efecto 3D"></button> 
+        <button class="toggle-3d-btn" title="Toca aquí para cambiar intensidad 3D"></button> 
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
@@ -273,7 +273,6 @@
         });
 
         function loadSelectedModel(fileName) {
-            // CAMBIO AQUÍ: Eliminamos "assets/" de la ruta
             const fullPath = fileName; 
             
             viewerLeft.src = fullPath;
@@ -297,7 +296,12 @@
         const toggle3dButtons = document.querySelectorAll('.toggle-3d-btn');
 
         let currentStereoGap = 0;
-        let is3DActive = false;   
+        
+        // --- CAMBIO: Variables para el ciclo de profundidad ---
+        const depthLevels = [0, 3, 6, 9]; // Los niveles de profundidad en grados
+        let currentLevelIndex = 0; // Empieza en el índice 0 (0 grados)
+        // -----------------------------------------------------
+
         const degToRad = (deg) => deg * (Math.PI / 180);
 
         const syncViewers = (source, target, direction) => {
@@ -367,17 +371,26 @@
             requestAnimationFrame(update);
         }
 
+        // --- CAMBIO: Nueva lógica del botón fantasma para ciclar 0 -> 3 -> 6 -> 9 -> 0 ---
         toggle3dButtons.forEach(btn => {
             btn.addEventListener('click', () => {
-                if (!is3DActive) {
-                    is3DActive = true;
-                    animateGapChange(0, 3, 1000);
-                } else {
-                    is3DActive = false;
-                    animateGapChange(3, 0, 1000);
-                }
+                // 1. Calcular el siguiente índice
+                const nextLevelIndex = (currentLevelIndex + 1) % depthLevels.length;
+                
+                // 2. Obtener los valores de inicio y fin para la animación
+                const startGap = depthLevels[currentLevelIndex];
+                const endGap = depthLevels[nextLevelIndex];
+
+                // 3. Ejecutar la animación
+                animateGapChange(startGap, endGap, 1000);
+
+                // 4. Actualizar el índice actual
+                currentLevelIndex = nextLevelIndex;
+
+                console.log(`Profundidad cambiada a: ${endGap} grados`);
             });
         });
+        // ----------------------------------------------------------------------------------
 
         sbsButtons.forEach(btn => {
             btn.addEventListener('click', () => {
