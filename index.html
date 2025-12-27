@@ -17,6 +17,42 @@
             touch-action: none; 
         }
 
+        /* --- PANTALLA DE INICIO (NUEVA) --- */
+        #landing-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            z-index: 10000; /* Por encima de todo */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.8s ease;
+        }
+        
+        #start-btn {
+            padding: 20px 40px;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 1px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 122, 204, 0.5);
+            transition: transform 0.2s, background-color 0.2s;
+            text-transform: uppercase;
+        }
+
+        #start-btn:hover {
+            transform: scale(1.05);
+            background-color: #0099ff;
+        }
+
         /* --- MENÚ DE SELECCIÓN --- */
         #menu-screen {
             position: absolute;
@@ -30,12 +66,17 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: white;
             transition: opacity 0.5s ease;
+            opacity: 0; /* Oculto al principio, aparece tras el Fullscreen */
+            pointer-events: none;
         }
 
-        #menu-screen.hidden { opacity: 0; pointer-events: none; }
-        h1 { margin-bottom: 30px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; text-align: center;}
+        #menu-screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        h1 { margin-bottom: 30px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; text-align: center; color: white;}
 
         .file-list {
             display: flex;
@@ -73,6 +114,9 @@
             height: 100%;
             opacity: 0; 
             transition: opacity 1s ease;
+            position: absolute;
+            top: 0;
+            z-index: 1;
         }
         #main-container.visible { opacity: 1; }
 
@@ -103,6 +147,7 @@
             box-sizing: border-box;
             transition: width 0.3s;
             display: none; 
+            z-index: 500;
         }
         .hud-container.active { display: block; }
 
@@ -127,21 +172,24 @@
             pointer-events: auto;
             z-index: 100;
         }
-        .btn-fs { left: 20px; }
-        .btn-sbs { right: 20px; }
+        
+        /* Centramos el botón SBS ya que es el único que queda */
+        .btn-sbs { 
+            right: 20px; 
+        }
 
         /* --- ZONA TÁCTIL SUPERIOR (Botón Invisible) --- */
         .toggle-3d-btn {
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;         /* Ocupa todo el ancho disponible */
-            height: 120px;       /* Zona generosa en la parte superior */
+            width: 100%;          
+            height: 150px;       /* Aumentado un poco para facilitar el toque */
             background: transparent;
             border: none;
             cursor: pointer;
-            pointer-events: none; /* Desactivado por defecto hasta entrar en SBS */
-            z-index: 50;         /* Por encima del modelo 3D */
+            pointer-events: none; 
+            z-index: 50;         
             outline: none;
         }
 
@@ -150,17 +198,26 @@
             pointer-events: auto; 
         }
 
+        /* Utilidad para ocultar elementos visualmente */
+        .hidden { opacity: 0; pointer-events: none; }
+        .gone { display: none !important; }
+
     </style>
 
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 </head>
 <body>
 
+    <div id="landing-screen">
+        <button id="start-btn">Entrar en Pantalla Completa</button>
+        <p style="color: #666; margin-top: 20px;">Experiencia Inmersiva WebXR</p>
+    </div>
+
     <div id="menu-screen">
         <h1>Seleccionar Modelo</h1>
         <div class="file-list" id="file-list-container">
             </div>
-        <p style="margin-top:20px; font-size: 0.8em; color: #666;">Para cambiar, recarga la página.</p>
+        <p style="margin-top:20px; font-size: 0.8em; color: #666;">Selecciona para cargar</p>
     </div>
 
     <div id="main-container">
@@ -177,21 +234,17 @@
 
     <div id="hud-left" class="hud-container">
         <button class="toggle-3d-btn" title="Toca aquí para efecto 3D"></button> 
-        
-        <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
     <div id="hud-right" class="hud-container">
         <button class="toggle-3d-btn" title="Toca aquí para efecto 3D"></button> 
-        
-        <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
     <script>
         // ==========================================
-        // 1. LISTA DE ARCHIVOS (EDITAR AQUÍ)
+        // CONFIGURACIÓN DE ARCHIVOS
         // ==========================================
         const assetFiles = [
             "Doritos.glb",
@@ -203,6 +256,9 @@
         ];
         // ==========================================
 
+        // Referencias al DOM
+        const landingScreen = document.getElementById('landing-screen');
+        const startBtn = document.getElementById('start-btn');
         const menuScreen = document.getElementById('menu-screen');
         const fileListContainer = document.getElementById('file-list-container');
         const mainContainer = document.getElementById('main-container');
@@ -211,7 +267,28 @@
         const viewerLeft = document.querySelector('#viewer-left');
         const viewerRight = document.querySelector('#viewer-right');
 
-        // --- Generar Menú ---
+        // ==========================================
+        // 1. LÓGICA DE INICIO (Fullscreen -> Menú)
+        // ==========================================
+        startBtn.addEventListener('click', () => {
+            // Solicitar pantalla completa
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(e => {
+                    console.log("Fullscreen denegado o no soportado, continuando igual.");
+                });
+            }
+            
+            // Transición: Ocultar Landing -> Mostrar Menú
+            landingScreen.classList.add('hidden');
+            setTimeout(() => {
+                landingScreen.classList.add('gone'); // Eliminar del flujo
+                menuScreen.classList.add('active');  // Mostrar menú
+            }, 800);
+        });
+
+        // ==========================================
+        // 2. GENERAR MENÚ
+        // ==========================================
         assetFiles.forEach(fileName => {
             const btn = document.createElement('button');
             btn.className = 'file-btn';
@@ -225,27 +302,32 @@
             const fullPath = `assets/${fileName}`;
             viewerLeft.src = fullPath;
             viewerRight.src = fullPath;
+
+            // Ocultar Menú -> Mostrar Visor
+            menuScreen.classList.remove('active');
             menuScreen.classList.add('hidden');
+            
             setTimeout(() => {
                 mainContainer.classList.add('visible');
                 hudLeft.classList.add('active');
                 hudRight.classList.add('active');
             }, 300);
+
             setTimeout(() => syncViewers(viewerLeft, viewerRight, 'LtoR'), 500);
         }
 
         // ==========================================
-        // LÓGICA CORE
+        // 3. LÓGICA DEL VISOR (SBS y 3D)
         // ==========================================
         const bodyElement = document.body;
         const sbsButtons = document.querySelectorAll('.btn-sbs');
-        const fsButtons = document.querySelectorAll('.btn-fs');
         const toggle3dButtons = document.querySelectorAll('.toggle-3d-btn');
 
         let currentStereoGap = 0;
         let is3DActive = false;   
         const degToRad = (deg) => deg * (Math.PI / 180);
 
+        // Sincronización de cámaras
         const syncViewers = (source, target, direction) => {
             const orbit = source.getCameraOrbit(); 
             const fieldOfView = source.getFieldOfView();
@@ -272,6 +354,7 @@
             if (event.detail.source === 'user-interaction') syncViewers(viewerRight, viewerLeft, 'RtoL');
         });
 
+        // Animación de separación de ojos
         function animateGapChange(startGap, endGap, duration) {
             const startTime = performance.now();
             const currentLeftOrbit = viewerLeft.getCameraOrbit();
@@ -291,7 +374,6 @@
                 currentStereoGap = startGap + (endGap - startGap) * ease;
                 const halfGapRad = degToRad(currentStereoGap / 2);
                 
-                // Aplicar separación desde el centro calculado
                 const leftTheta = centerTheta + halfGapRad;
                 const rightTheta = centerTheta - halfGapRad;
 
@@ -314,36 +396,26 @@
             requestAnimationFrame(update);
         }
 
+        // Evento: Activar/Desactivar profundidad 3D
         toggle3dButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 if (!is3DActive) {
                     is3DActive = true;
-                    // Abrir 3 grados
                     animateGapChange(0, 3, 1000);
                 } else {
                     is3DActive = false;
-                    // Cerrar a 0 grados
                     animateGapChange(3, 0, 1000);
                 }
             });
         });
 
-        const hideButtons = (nodeList) => nodeList.forEach(btn => btn.style.display = 'none');
-
+        // Evento: Entrar en modo SBS
         sbsButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 bodyElement.classList.add('sbs-active');
                 syncViewers(viewerLeft, viewerRight, 'LtoR');
-                hideButtons(sbsButtons);
-            });
-        });
-
-        fsButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen().catch(e => console.error(e));
-                }
-                hideButtons(fsButtons);
+                // Ocultar botones SBS
+                sbsButtons.forEach(b => b.style.display = 'none');
             });
         });
 
@@ -351,4 +423,3 @@
     </script>
 </body>
 </html>
-
