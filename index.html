@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor 3D GLB - Efecto 3DS</title>
+    <title>Visor 3D GLB - Slider Optimizado Móvil</title>
     
     <style>
         body {
@@ -14,6 +14,8 @@
             background-color: #000;
             font-family: sans-serif;
             overflow: hidden;
+            /* Evita el rebote de scroll en iOS */
+            touch-action: none; 
         }
 
         #main-container {
@@ -44,7 +46,7 @@
             pointer-events: none;
         }
 
-        /* --- HUD (Capas de interfaz) --- */
+        /* --- HUD --- */
         .hud-container {
             position: absolute;
             top: 0;
@@ -60,75 +62,92 @@
         body.sbs-active #hud-left { width: 50%; }
         body.sbs-active #hud-right { display: block; }
 
-        /* --- BOTONES (Solo un uso) --- */
+        /* --- BOTONES --- */
         .control-btn {
             position: absolute;
             bottom: 20px;
-            padding: 10px 16px;
+            padding: 12px 20px; /* Un poco más grandes */
             background-color: rgba(51, 51, 51, 0.9);
             color: white;
             border: none;
             border-radius: 8px;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 16px; /* Texto más legible */
             cursor: pointer;
             pointer-events: auto;
             transition: opacity 0.3s;
         }
-        .control-btn:hover { background-color: #777; }
         .btn-fs { left: 20px; }
         .btn-sbs { right: 20px; }
 
-        /* --- NUEVO: SLIDER DE EFECTO 3D --- */
+
+        /* --- NUEVO ESTILO: SLIDER GIGANTE --- */
         .stereo-controls {
             position: absolute;
-            top: 20px; /* Arriba para no estorbar botones */
+            top: 30px; 
             left: 50%;
             transform: translateX(-50%);
-            width: 80%;
+            width: 85%; /* Más ancho */
             text-align: center;
-            pointer-events: auto;
-            opacity: 0; /* Oculto en modo normal */
+            pointer-events: auto; /* IMPORTANTE: Captura el clic */
+            opacity: 0; 
             transition: opacity 0.5s;
+            
+            /* Zona segura táctil */
+            padding: 20px 0; 
+            background: rgba(0,0,0,0.3); /* Fondo sutil para ver dónde tocar */
+            border-radius: 15px;
         }
 
-        /* Solo visible en SBS */
-        body.sbs-active .stereo-controls {
-            opacity: 1;
-        }
+        body.sbs-active .stereo-controls { opacity: 1; }
 
         .stereo-label {
-            color: #ccc;
-            font-size: 12px;
-            margin-bottom: 5px;
-            text-shadow: 1px 1px 2px black;
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 0px 2px 4px black;
             display: block;
+            pointer-events: none; /* El texto no interfiere */
         }
 
         /* Estilo del Slider (Range) */
         input[type=range] {
             -webkit-appearance: none;
-            width: 100%;
+            width: 90%;
             background: transparent;
+            cursor: pointer;
         }
 
+        /* --- CÍRCULO DEL DESLIZADOR (THUMB) --- */
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 20px;
-            width: 20px;
+            height: 35px;  /* MUCHO MÁS GRANDE */
+            width: 35px;   /* MUCHO MÁS GRANDE */
             border-radius: 50%;
-            background: #007bff; /* Azul vibrante */
-            cursor: pointer;
-            margin-top: -8px;
-            border: 2px solid white;
+            background: #007bff;
+            border: 3px solid white;
+            margin-top: -14px; /* Centrado vertical respecto a la barra */
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5); /* Sombra para profundidad */
         }
 
+        /* --- BARRA DEL DESLIZADOR (TRACK) --- */
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
-            height: 4px;
+            height: 8px; /* BARRA MÁS GRUESA */
             cursor: pointer;
-            background: #555;
-            border-radius: 2px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 4px;
+            border: 1px solid rgba(0,0,0,0.5);
+        }
+
+        /* Firefox Support (por si acaso) */
+        input[type=range]::-moz-range-thumb {
+            height: 35px;
+            width: 35px;
+            border-radius: 50%;
+            background: #007bff;
+            border: 3px solid white;
         }
 
     </style>
@@ -161,20 +180,18 @@
 
     <div id="hud-left" class="hud-container">
         <div class="stereo-controls">
-            <span class="stereo-label">Profundidad 3D</span>
+            <span class="stereo-label">Ajuste 3D</span>
             <input type="range" class="stereo-slider" min="0" max="6" step="0.1" value="0">
         </div>
-
         <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
     <div id="hud-right" class="hud-container">
         <div class="stereo-controls">
-            <span class="stereo-label">Profundidad 3D</span>
+            <span class="stereo-label">Ajuste 3D</span>
             <input type="range" class="stereo-slider" min="0" max="6" step="0.1" value="0">
         </div>
-
         <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
@@ -186,89 +203,69 @@
         const sbsButtons = document.querySelectorAll('.btn-sbs');
         const fsButtons = document.querySelectorAll('.btn-fs');
         const stereoSliders = document.querySelectorAll('.stereo-slider');
+        const stereoControlsDivs = document.querySelectorAll('.stereo-controls');
 
-        // Variable global para guardar la separación actual (en grados)
         let currentStereoGap = 0;
-
-        // --- FUNCIONES MATEMÁTICAS ---
-        
-        // Convertir Grados a Radianes
         const degToRad = (deg) => deg * (Math.PI / 180);
 
-        // --- LOGICA DE SINCRONIZACIÓN CON EFECTO 3D ---
-        
-        // direction: 'LtoR' (Izquierda manda) o 'RtoL' (Derecha manda)
+        // --- 1. BLOQUEO DE INTERFERENCIA TÁCTIL ---
+        // Esto es lo que evita que el modelo se mueva cuando tocas el slider
+        stereoControlsDivs.forEach(div => {
+            const stopPropagation = (e) => e.stopPropagation();
+            // Bloqueamos eventos táctiles y de mouse para que no lleguen al viewer
+            div.addEventListener('pointerdown', stopPropagation);
+            div.addEventListener('touchstart', stopPropagation);
+            div.addEventListener('touchmove', stopPropagation);
+            div.addEventListener('mousedown', stopPropagation);
+        });
+
+        // --- 2. SINCRONIZACIÓN 3D ---
         const syncViewers = (source, target, direction) => {
-            const orbit = source.getCameraOrbit(); // {theta, phi, radius} (theta está en radianes)
+            const orbit = source.getCameraOrbit(); 
             const fieldOfView = source.getFieldOfView();
             const targetPos = source.getCameraTarget();
-
-            // Calculamos el offset en radianes basado en el slider
             const gapRad = degToRad(currentStereoGap);
 
-            // LOGICA MAESTRA 3D:
-            // Si movemos el visor Izquierdo, el Derecho debe estar a (Theta + 2*Gap)
-            // Si movemos el visor Derecho, el Izquierdo debe estar a (Theta - 2*Gap)
-            // Esto mantiene la separación relativa constante.
-            
             let newTheta = orbit.theta;
-
             if (direction === 'LtoR') {
-                // Soy la izq, la derecha debe ser YO + la separación total
-                newTheta = orbit.theta + (gapRad * 2); // *2 para simular separación desde el centro
+                newTheta = orbit.theta + (gapRad * 2); 
             } else {
-                // Soy la derecha, la izq debe ser YO - la separación total
                 newTheta = orbit.theta - (gapRad * 2);
             }
 
-            // Aplicamos
             target.cameraOrbit = `${newTheta}rad ${orbit.phi}rad ${orbit.radius}m`;
             target.fieldOfView = `${fieldOfView}deg`;
             target.cameraTarget = `${targetPos.x}m ${targetPos.y}m ${targetPos.z}m`;
-            
             target.jumpCameraToGoal();
         };
 
-        // --- EVENTOS DE CÁMARA ---
         viewerLeft.addEventListener('camera-change', (event) => {
-            if (event.detail.source === 'user-interaction') {
-                syncViewers(viewerLeft, viewerRight, 'LtoR');
-            }
+            if (event.detail.source === 'user-interaction') syncViewers(viewerLeft, viewerRight, 'LtoR');
         });
 
         viewerRight.addEventListener('camera-change', (event) => {
-            if (event.detail.source === 'user-interaction') {
-                syncViewers(viewerRight, viewerLeft, 'RtoL');
-            }
+            if (event.detail.source === 'user-interaction') syncViewers(viewerRight, viewerLeft, 'RtoL');
         });
 
-        // --- LÓGICA DEL SLIDER 3D ---
+        // --- 3. LÓGICA SLIDER ---
         const updateStereoEffect = (value) => {
             currentStereoGap = parseFloat(value);
-            
-            // Sincronizar visualmente ambos sliders
             stereoSliders.forEach(slider => slider.value = currentStereoGap);
-
-            // Forzar una actualización de las cámaras para aplicar el nuevo efecto
-            // Usamos la izquierda como referencia base
             syncViewers(viewerLeft, viewerRight, 'LtoR');
         };
 
         stereoSliders.forEach(slider => {
-            // Evento 'input' para tiempo real mientras deslizas
-            slider.addEventListener('input', (e) => {
-                updateStereoEffect(e.target.value);
-            });
+            slider.addEventListener('input', (e) => updateStereoEffect(e.target.value));
+            // También prevenimos la propagación en el input directo por si acaso
+            slider.addEventListener('pointerdown', (e) => e.stopPropagation());
         });
 
-
-        // --- BOTONES ---
+        // --- 4. BOTONES ---
         const hideButtons = (nodeList) => nodeList.forEach(btn => btn.style.display = 'none');
 
         sbsButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 bodyElement.classList.add('sbs-active');
-                // Al entrar, aseguramos sincronización inicial
                 syncViewers(viewerLeft, viewerRight, 'LtoR');
                 hideButtons(sbsButtons);
             });
