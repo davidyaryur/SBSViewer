@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor 3D GLB - Sincronización Perfecta</title>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+
+        #main-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            background-color: #f0f0f0;
+            outline: none; 
+        }
+
+        #viewer-right {
+            width: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* MODO SBS ACTIVO */
+        body.sbs-active #viewer-left,
+        body.sbs-active #viewer-right {
+            width: 50%;
+            opacity: 1;
+            pointer-events: auto;
+            border-right: 1px solid #333;
+        }
+        
+        #sbs-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 18px;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        body.sbs-active #sbs-btn {
+             background-color: #007bff;
+        }
+    </style>
+
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+</head>
+<body>
+
+    <div id="main-container">
+        <model-viewer 
+            id="viewer-left"
+            src="assets/tu_modelo.glb" 
+            alt="Modelo 3D Izquierda"
+            camera-controls 
+            shadow-intensity="1"
+            exposure="1"
+            interaction-prompt="none"> 
+        </model-viewer>
+
+        <model-viewer 
+            id="viewer-right"
+            src="assets/tu_modelo.glb" 
+            alt="Modelo 3D Derecha"
+            camera-controls 
+            shadow-intensity="1"
+            exposure="1"
+            interaction-prompt="none">
+        </model-viewer>
+    </div>
+
+    <button id="sbs-btn">SBS Mode</button>
+
+    <script>
+        const sbsButton = document.getElementById('sbs-btn');
+        const bodyElement = document.body;
+        const viewerLeft = document.querySelector('#viewer-left');
+        const viewerRight = document.querySelector('#viewer-right');
+
+        // Función para copiar posición sin causar bucles
+        const syncViewers = (source, target) => {
+            // Obtenemos la órbita y el campo de visión actuales del origen
+            const orbit = source.getCameraOrbit();
+            const fieldOfView = source.getFieldOfView();
+
+            // Los aplicamos al destino
+            // Usamos las propiedades directas en lugar de atributos para mayor precisión
+            target.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${orbit.radius}m`;
+            target.fieldOfView = `${fieldOfView}deg`;
+            
+            // Forzamos el salto instantáneo para que no haya retraso visual
+            target.jumpCameraToGoal();
+        };
+
+        // EVENTO IZQUIERDO
+        viewerLeft.addEventListener('camera-change', (event) => {
+            // EL SECRETO: Solo sincronizamos si es interacción de USUARIO
+            if (event.detail.source === 'user-interaction') {
+                syncViewers(viewerLeft, viewerRight);
+            }
+        });
+
+        // EVENTO DERECHO
+        viewerRight.addEventListener('camera-change', (event) => {
+            // EL SECRETO: Solo sincronizamos si es interacción de USUARIO
+            if (event.detail.source === 'user-interaction') {
+                syncViewers(viewerRight, viewerLeft);
+            }
+        });
+
+        // Botón SBS
+        sbsButton.addEventListener('click', () => {
+            bodyElement.classList.toggle('sbs-active');
+            if (bodyElement.classList.contains('sbs-active')) {
+                sbsButton.textContent = 'Exit SBS';
+                // Al activar, igualamos la derecha a la izquierda
+                syncViewers(viewerLeft, viewerRight);
+            } else {
+                sbsButton.textContent = 'SBS Mode';
+            }
+        });
+        
+    </script>
+
+</body>
+</html>
