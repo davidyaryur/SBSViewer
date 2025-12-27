@@ -17,7 +17,7 @@
             touch-action: none; 
         }
 
-        /* --- PANTALLA DE INICIO (NUEVA) --- */
+        /* --- PANTALLA DE INICIO --- */
         #landing-screen {
             position: absolute;
             top: 0;
@@ -25,7 +25,7 @@
             width: 100%;
             height: 100%;
             background-color: #000;
-            z-index: 10000; /* Por encima de todo */
+            z-index: 10000;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -67,7 +67,7 @@
             align-items: center;
             justify-content: center;
             transition: opacity 0.5s ease;
-            opacity: 0; /* Oculto al principio, aparece tras el Fullscreen */
+            opacity: 0;
             pointer-events: none;
         }
 
@@ -157,7 +157,7 @@
         body.sbs-active #hud-left { width: 50%; }
         body.sbs-active #hud-right { display: block; }
 
-        /* --- BOTONES DE CONFIGURACIÓN (INFERIORES) --- */
+        /* --- BOTONES DE CONFIGURACIÓN --- */
         .control-btn {
             position: absolute;
             bottom: 20px;
@@ -173,18 +173,15 @@
             z-index: 100;
         }
         
-        /* Centramos el botón SBS ya que es el único que queda */
-        .btn-sbs { 
-            right: 20px; 
-        }
+        .btn-sbs { right: 20px; }
 
-        /* --- ZONA TÁCTIL SUPERIOR (Botón Invisible) --- */
+        /* --- ZONA TÁCTIL SUPERIOR --- */
         .toggle-3d-btn {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;          
-            height: 150px;       /* Aumentado un poco para facilitar el toque */
+            height: 150px;
             background: transparent;
             border: none;
             cursor: pointer;
@@ -193,12 +190,7 @@
             outline: none;
         }
 
-        /* Solo activamos el área táctil cuando estamos en SBS */
-        body.sbs-active .toggle-3d-btn {
-            pointer-events: auto; 
-        }
-
-        /* Utilidad para ocultar elementos visualmente */
+        body.sbs-active .toggle-3d-btn { pointer-events: auto; }
         .hidden { opacity: 0; pointer-events: none; }
         .gone { display: none !important; }
 
@@ -215,21 +207,13 @@
 
     <div id="menu-screen">
         <h1>Seleccionar Modelo</h1>
-        <div class="file-list" id="file-list-container">
-            </div>
+        <div class="file-list" id="file-list-container"></div>
         <p style="margin-top:20px; font-size: 0.8em; color: #666;">Selecciona para cargar</p>
     </div>
 
     <div id="main-container">
-        <model-viewer 
-            id="viewer-left" src="" alt="Left"
-            camera-controls shadow-intensity="1" exposure="1" interaction-prompt="none"> 
-        </model-viewer>
-
-        <model-viewer 
-            id="viewer-right" src="" alt="Right"
-            camera-controls shadow-intensity="1" exposure="1" interaction-prompt="none">
-        </model-viewer>
+        <model-viewer id="viewer-left" src="" alt="Left" camera-controls shadow-intensity="1" exposure="1" interaction-prompt="none"></model-viewer>
+        <model-viewer id="viewer-right" src="" alt="Right" camera-controls shadow-intensity="1" exposure="1" interaction-prompt="none"></model-viewer>
     </div>
 
     <div id="hud-left" class="hud-container">
@@ -247,16 +231,15 @@
         // CONFIGURACIÓN DE ARCHIVOS
         // ==========================================
         const assetFiles = [
-            "Doritos.glb",
-            "NatuChips.glb",
-            "Iselitas.glb",
-            "Kotex.glb",
-            "CaledoniaClasico.glb",
-            "CaledoniaMega.glb"
+            "doritos.glb",
+            "natuchips.glb",
+            "iselitas.glb",
+            "kotex.glb",
+            "caledonia_clasico.glb",
+            "caledonia_mega.glb"
         ];
         // ==========================================
 
-        // Referencias al DOM
         const landingScreen = document.getElementById('landing-screen');
         const startBtn = document.getElementById('start-btn');
         const menuScreen = document.getElementById('menu-screen');
@@ -267,28 +250,19 @@
         const viewerLeft = document.querySelector('#viewer-left');
         const viewerRight = document.querySelector('#viewer-right');
 
-        // ==========================================
-        // 1. LÓGICA DE INICIO (Fullscreen -> Menú)
-        // ==========================================
+        // INICIO
         startBtn.addEventListener('click', () => {
-            // Solicitar pantalla completa
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(e => {
-                    console.log("Fullscreen denegado o no soportado, continuando igual.");
-                });
+                document.documentElement.requestFullscreen().catch(e => console.log("FS bloqueado"));
             }
-            
-            // Transición: Ocultar Landing -> Mostrar Menú
             landingScreen.classList.add('hidden');
             setTimeout(() => {
-                landingScreen.classList.add('gone'); // Eliminar del flujo
-                menuScreen.classList.add('active');  // Mostrar menú
+                landingScreen.classList.add('gone'); 
+                menuScreen.classList.add('active'); 
             }, 800);
         });
 
-        // ==========================================
-        // 2. GENERAR MENÚ
-        // ==========================================
+        // GENERAR MENÚ
         assetFiles.forEach(fileName => {
             const btn = document.createElement('button');
             btn.className = 'file-btn';
@@ -299,11 +273,12 @@
         });
 
         function loadSelectedModel(fileName) {
-            const fullPath = `assets/${fileName}`;
+            // CAMBIO AQUÍ: Eliminamos "assets/" de la ruta
+            const fullPath = fileName; 
+            
             viewerLeft.src = fullPath;
             viewerRight.src = fullPath;
 
-            // Ocultar Menú -> Mostrar Visor
             menuScreen.classList.remove('active');
             menuScreen.classList.add('hidden');
             
@@ -316,9 +291,7 @@
             setTimeout(() => syncViewers(viewerLeft, viewerRight, 'LtoR'), 500);
         }
 
-        // ==========================================
-        // 3. LÓGICA DEL VISOR (SBS y 3D)
-        // ==========================================
+        // LÓGICA VISOR
         const bodyElement = document.body;
         const sbsButtons = document.querySelectorAll('.btn-sbs');
         const toggle3dButtons = document.querySelectorAll('.toggle-3d-btn');
@@ -327,7 +300,6 @@
         let is3DActive = false;   
         const degToRad = (deg) => deg * (Math.PI / 180);
 
-        // Sincronización de cámaras
         const syncViewers = (source, target, direction) => {
             const orbit = source.getCameraOrbit(); 
             const fieldOfView = source.getFieldOfView();
@@ -354,7 +326,6 @@
             if (event.detail.source === 'user-interaction') syncViewers(viewerRight, viewerLeft, 'RtoL');
         });
 
-        // Animación de separación de ojos
         function animateGapChange(startGap, endGap, duration) {
             const startTime = performance.now();
             const currentLeftOrbit = viewerLeft.getCameraOrbit();
@@ -396,7 +367,6 @@
             requestAnimationFrame(update);
         }
 
-        // Evento: Activar/Desactivar profundidad 3D
         toggle3dButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 if (!is3DActive) {
@@ -409,12 +379,10 @@
             });
         });
 
-        // Evento: Entrar en modo SBS
         sbsButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 bodyElement.classList.add('sbs-active');
                 syncViewers(viewerLeft, viewerRight, 'LtoR');
-                // Ocultar botones SBS
                 sbsButtons.forEach(b => b.style.display = 'none');
             });
         });
