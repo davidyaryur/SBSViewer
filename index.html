@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor 3D GLB - Inmersión Total</title>
+    <title>Visor 3D GLB - Inmersivo</title>
     
     <style>
         body {
@@ -12,16 +12,69 @@
             width: 100vw;
             height: 100vh;
             background-color: #000;
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
             touch-action: none; 
         }
 
+        /* --- MENÚ DE SELECCIÓN --- */
+        #menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1a1a1a;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            transition: opacity 0.5s ease;
+        }
+
+        #menu-screen.hidden { opacity: 0; pointer-events: none; }
+        h1 { margin-bottom: 30px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; text-align: center;}
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 70vh;
+            overflow-y: auto;
+            width: 80%;
+            max-width: 400px;
+            padding-right: 10px;
+        }
+
+        .file-btn {
+            padding: 15px 20px;
+            background-color: #333;
+            border: 1px solid #444;
+            color: #ddd;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-btn:hover { background-color: #007acc; color: white; transform: translateX(5px); }
+        .file-btn span { font-size: 0.8em; opacity: 0.6; }
+
+        /* --- VISORES --- */
         #main-container {
             display: flex;
             width: 100%;
             height: 100%;
+            opacity: 0; 
+            transition: opacity 1s ease;
         }
+        #main-container.visible { opacity: 1; }
 
         model-viewer {
             width: 100%;
@@ -36,15 +89,10 @@
             width: 50%;
             opacity: 1;
             pointer-events: auto;
-            /* CAMBIO: Eliminada la línea divisoria (border-right) */
             border: none; 
         }
 
-        #viewer-right {
-            width: 0;
-            opacity: 0;
-            pointer-events: none;
-        }
+        #viewer-right { width: 0; opacity: 0; pointer-events: none; }
 
         /* --- HUD --- */
         .hud-container {
@@ -54,7 +102,9 @@
             pointer-events: none; 
             box-sizing: border-box;
             transition: width 0.3s;
+            display: none; 
         }
+        .hud-container.active { display: block; }
 
         #hud-left { left: 0; width: 100%; }
         #hud-right { left: 50%; width: 50%; display: none; }
@@ -62,7 +112,7 @@
         body.sbs-active #hud-left { width: 50%; }
         body.sbs-active #hud-right { display: block; }
 
-        /* --- BOTONES DE CONFIGURACIÓN --- */
+        /* --- BOTONES DE CONFIGURACIÓN (INFERIORES) --- */
         .control-btn {
             position: absolute;
             bottom: 20px;
@@ -75,36 +125,29 @@
             font-size: 16px;
             cursor: pointer;
             pointer-events: auto;
+            z-index: 100;
         }
         .btn-fs { left: 20px; }
         .btn-sbs { right: 20px; }
 
-
-        /* --- BOTÓN FANTASMA (Invisible pero funcional) --- */
+        /* --- ZONA TÁCTIL SUPERIOR (Botón Invisible) --- */
         .toggle-3d-btn {
             position: absolute;
-            top: 20px; 
-            left: 50%;
-            transform: translateX(-50%);
-            
-            width: 80px; /* Área de toque generosa */
-            height: 80px;
-            border-radius: 50%;
-            
-            /* CAMBIO: Totalmente invisible */
+            top: 0;
+            left: 0;
+            width: 100%;         /* Ocupa todo el ancho disponible */
+            height: 120px;       /* Zona generosa en la parte superior */
             background: transparent;
             border: none;
-            color: transparent;
-            opacity: 0; /* Invisible visualmente */
-            
             cursor: pointer;
-            pointer-events: none; /* Desactivado por defecto */
+            pointer-events: none; /* Desactivado por defecto hasta entrar en SBS */
+            z-index: 50;         /* Por encima del modelo 3D */
+            outline: none;
         }
 
-        /* Solo activamos el área de clic cuando estamos en SBS */
+        /* Solo activamos el área táctil cuando estamos en SBS */
         body.sbs-active .toggle-3d-btn {
             pointer-events: auto; 
-            /* Nota: Mantenemos opacity 0 para que no se vea */
         }
 
     </style>
@@ -113,53 +156,97 @@
 </head>
 <body>
 
+    <div id="menu-screen">
+        <h1>Seleccionar Modelo</h1>
+        <div class="file-list" id="file-list-container">
+            </div>
+        <p style="margin-top:20px; font-size: 0.8em; color: #666;">Para cambiar, recarga la página.</p>
+    </div>
+
     <div id="main-container">
         <model-viewer 
-            id="viewer-left"
-            src="assets/tu_modelo.glb" 
-            alt="Modelo 3D Izquierda"
-            camera-controls 
-            shadow-intensity="1"
-            exposure="1"
-            interaction-prompt="none"> 
+            id="viewer-left" src="" alt="Left"
+            camera-controls shadow-intensity="1" exposure="1" interaction-prompt="none"> 
         </model-viewer>
 
         <model-viewer 
-            id="viewer-right"
-            src="assets/tu_modelo.glb" 
-            alt="Modelo 3D Derecha"
-            camera-controls 
-            shadow-intensity="1"
-            exposure="1"
-            interaction-prompt="none">
+            id="viewer-right" src="" alt="Right"
+            camera-controls shadow-intensity="1" exposure="1" interaction-prompt="none">
         </model-viewer>
     </div>
 
     <div id="hud-left" class="hud-container">
-        <button class="toggle-3d-btn">3D Toggle</button> <button class="control-btn btn-fs">Pantalla Completa</button>
+        <button class="toggle-3d-btn" title="Toca aquí para efecto 3D"></button> 
+        
+        <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
     <div id="hud-right" class="hud-container">
-        <button class="toggle-3d-btn">3D Toggle</button> <button class="control-btn btn-fs">Pantalla Completa</button>
+        <button class="toggle-3d-btn" title="Toca aquí para efecto 3D"></button> 
+        
+        <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
     <script>
-        const bodyElement = document.body;
+        // ==========================================
+        // 1. LISTA DE ARCHIVOS (EDITAR AQUÍ)
+        // ==========================================
+        const assetFiles = [
+            "Doritos.glb",
+            "NatuChips.glb",
+            "Iselitas.glb",
+            "Kotex.glb",
+            "CaledoniaClasico.glb",
+            "CaledoniaMega.glb",
+            "Santa Teresa.glb"
+        ];
+        // ==========================================
+
+        const menuScreen = document.getElementById('menu-screen');
+        const fileListContainer = document.getElementById('file-list-container');
+        const mainContainer = document.getElementById('main-container');
+        const hudLeft = document.getElementById('hud-left');
+        const hudRight = document.getElementById('hud-right');
         const viewerLeft = document.querySelector('#viewer-left');
         const viewerRight = document.querySelector('#viewer-right');
-        
+
+        // --- Generar Menú ---
+        assetFiles.forEach(fileName => {
+            const btn = document.createElement('button');
+            btn.className = 'file-btn';
+            const displayName = fileName.replace('.glb', '').replace(/_/g, ' ').toUpperCase();
+            btn.innerHTML = `${displayName} <span>GLB</span>`;
+            btn.onclick = () => loadSelectedModel(fileName);
+            fileListContainer.appendChild(btn);
+        });
+
+        function loadSelectedModel(fileName) {
+            const fullPath = `assets/${fileName}`;
+            viewerLeft.src = fullPath;
+            viewerRight.src = fullPath;
+            menuScreen.classList.add('hidden');
+            setTimeout(() => {
+                mainContainer.classList.add('visible');
+                hudLeft.classList.add('active');
+                hudRight.classList.add('active');
+            }, 300);
+            setTimeout(() => syncViewers(viewerLeft, viewerRight, 'LtoR'), 500);
+        }
+
+        // ==========================================
+        // LÓGICA CORE
+        // ==========================================
+        const bodyElement = document.body;
         const sbsButtons = document.querySelectorAll('.btn-sbs');
         const fsButtons = document.querySelectorAll('.btn-fs');
         const toggle3dButtons = document.querySelectorAll('.toggle-3d-btn');
 
-        // Estado del sistema
-        let currentStereoGap = 0; // Grados totales de separación
+        let currentStereoGap = 0;
         let is3DActive = false;   
         const degToRad = (deg) => deg * (Math.PI / 180);
 
-        // --- 1. SINCRONIZACIÓN AL ARRASTRAR (User Interaction) ---
         const syncViewers = (source, target, direction) => {
             const orbit = source.getCameraOrbit(); 
             const fieldOfView = source.getFieldOfView();
@@ -167,9 +254,6 @@
             const gapRad = degToRad(currentStereoGap);
 
             let newTheta = orbit.theta;
-            
-            // Si el usuario mueve un lado, el otro lado debe mantener la distancia TOTAL
-            // Si muevo la izquierda, la derecha está a -GAP de distancia
             if (direction === 'LtoR') {
                 newTheta = orbit.theta - gapRad; 
             } else {
@@ -189,15 +273,8 @@
             if (event.detail.source === 'user-interaction') syncViewers(viewerRight, viewerLeft, 'RtoL');
         });
 
-        // --- 2. ANIMACIÓN SIMÉTRICA (El pivote central) ---
-        
         function animateGapChange(startGap, endGap, duration) {
             const startTime = performance.now();
-            
-            // 1. CAPTURAMOS EL "CENTRO" ACTUAL
-            // Si el gap actual es 0, el centro es la cámara izquierda (o derecha, son iguales).
-            // Si el gap actual es 3, la cámara izquierda está desplazada +1.5 del centro.
-            // Formula: Centro = AnguloIzquierda - (GapActual / 2)
             const currentLeftOrbit = viewerLeft.getCameraOrbit();
             const currentOrbitData = {
                 phi: currentLeftOrbit.phi,
@@ -205,34 +282,23 @@
                 target: viewerLeft.getCameraTarget(),
                 fov: viewerLeft.getFieldOfView()
             };
-            
-            // Calculamos el ángulo central "puro" antes de empezar a movernos
             const centerTheta = currentLeftOrbit.theta - degToRad(startGap / 2);
 
             function update(currentTime) {
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
-                
-                // Easing suave
                 const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-                // Calculamos el nuevo Gap total
                 currentStereoGap = startGap + (endGap - startGap) * ease;
-                
-                // Calculamos la mitad del gap (para mover cada ojo la mitad)
                 const halfGapRad = degToRad(currentStereoGap / 2);
-
-                // --- MAGIA SIMÉTRICA ---
-                // Izquierda se mueve +1.5 (hacia un lado)
+                
+                // Aplicar separación desde el centro calculado
                 const leftTheta = centerTheta + halfGapRad;
-                // Derecha se mueve -1.5 (hacia el otro lado)
                 const rightTheta = centerTheta - halfGapRad;
 
-                // Aplicamos a AMBOS visores
                 viewerLeft.cameraOrbit = `${leftTheta}rad ${currentOrbitData.phi}rad ${currentOrbitData.radius}m`;
                 viewerRight.cameraOrbit = `${rightTheta}rad ${currentOrbitData.phi}rad ${currentOrbitData.radius}m`;
                 
-                // Aseguramos que el resto de parámetros no se pierdan
                 const camString = `${currentOrbitData.target.x}m ${currentOrbitData.target.y}m ${currentOrbitData.target.z}m`;
                 const fovString = `${currentOrbitData.fov}deg`;
 
@@ -244,35 +310,30 @@
                 viewerLeft.jumpCameraToGoal();
                 viewerRight.jumpCameraToGoal();
 
-                if (progress < 1) {
-                    requestAnimationFrame(update);
-                }
+                if (progress < 1) requestAnimationFrame(update);
             }
             requestAnimationFrame(update);
         }
 
-        // --- 3. LOGICA BOTÓN FANTASMA ---
         toggle3dButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 if (!is3DActive) {
                     is3DActive = true;
-                    // Animamos de 0 a 3 grados (1.5 cada lado)
+                    // Abrir 3 grados
                     animateGapChange(0, 3, 1000);
                 } else {
                     is3DActive = false;
-                    // Animamos de 3 a 0 grados
+                    // Cerrar a 0 grados
                     animateGapChange(3, 0, 1000);
                 }
             });
         });
 
-        // --- 4. SETUP ---
         const hideButtons = (nodeList) => nodeList.forEach(btn => btn.style.display = 'none');
 
         sbsButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 bodyElement.classList.add('sbs-active');
-                // Sincronización inicial (Gap 0)
                 syncViewers(viewerLeft, viewerRight, 'LtoR');
                 hideButtons(sbsButtons);
             });
@@ -288,8 +349,6 @@
         });
 
         viewerLeft.addEventListener('load', () => syncViewers(viewerLeft, viewerRight, 'LtoR'));
-
     </script>
-
 </body>
 </html>
