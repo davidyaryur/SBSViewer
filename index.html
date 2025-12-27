@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor 3D GLB - Inmersivo Final</title>
+    <title>Visor 3D GLB - Efecto 3DS</title>
     
     <style>
         body {
@@ -11,7 +11,7 @@
             padding: 0;
             width: 100vw;
             height: 100vh;
-            background-color: #000; /* Fondo general negro */
+            background-color: #000;
             font-family: sans-serif;
             overflow: hidden;
         }
@@ -25,15 +25,8 @@
         model-viewer {
             width: 100%;
             height: 100%;
-            /* CAMBIO: Fondo negro para el modelo */
             background-color: #000; 
             outline: none; 
-        }
-
-        #viewer-right {
-            width: 0;
-            opacity: 0;
-            pointer-events: none;
         }
 
         /* --- LOGICA VISUAL SBS 3D --- */
@@ -43,6 +36,12 @@
             opacity: 1;
             pointer-events: auto;
             border-right: 1px solid #333;
+        }
+
+        #viewer-right {
+            width: 0;
+            opacity: 0;
+            pointer-events: none;
         }
 
         /* --- HUD (Capas de interfaz) --- */
@@ -55,21 +54,13 @@
             transition: width 0.3s;
         }
 
-        #hud-left {
-            left: 0;
-            width: 100%;
-        }
-
-        #hud-right {
-            left: 50%;
-            width: 50%;
-            display: none; 
-        }
+        #hud-left { left: 0; width: 100%; }
+        #hud-right { left: 50%; width: 50%; display: none; }
 
         body.sbs-active #hud-left { width: 50%; }
         body.sbs-active #hud-right { display: block; }
 
-        /* --- BOTONES --- */
+        /* --- BOTONES (Solo un uso) --- */
         .control-btn {
             position: absolute;
             bottom: 20px;
@@ -82,15 +73,63 @@
             font-size: 14px;
             cursor: pointer;
             pointer-events: auto;
-            transition: background-color 0.2s, opacity 0.3s; /* Animación para desaparecer */
+            transition: opacity 0.3s;
         }
-
-        .control-btn:hover {
-            background-color: #777;
-        }
-
+        .control-btn:hover { background-color: #777; }
         .btn-fs { left: 20px; }
         .btn-sbs { right: 20px; }
+
+        /* --- NUEVO: SLIDER DE EFECTO 3D --- */
+        .stereo-controls {
+            position: absolute;
+            top: 20px; /* Arriba para no estorbar botones */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            text-align: center;
+            pointer-events: auto;
+            opacity: 0; /* Oculto en modo normal */
+            transition: opacity 0.5s;
+        }
+
+        /* Solo visible en SBS */
+        body.sbs-active .stereo-controls {
+            opacity: 1;
+        }
+
+        .stereo-label {
+            color: #ccc;
+            font-size: 12px;
+            margin-bottom: 5px;
+            text-shadow: 1px 1px 2px black;
+            display: block;
+        }
+
+        /* Estilo del Slider (Range) */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #007bff; /* Azul vibrante */
+            cursor: pointer;
+            margin-top: -8px;
+            border: 2px solid white;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #555;
+            border-radius: 2px;
+        }
 
     </style>
 
@@ -121,11 +160,21 @@
     </div>
 
     <div id="hud-left" class="hud-container">
+        <div class="stereo-controls">
+            <span class="stereo-label">Profundidad 3D</span>
+            <input type="range" class="stereo-slider" min="0" max="6" step="0.1" value="0">
+        </div>
+
         <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
 
     <div id="hud-right" class="hud-container">
+        <div class="stereo-controls">
+            <span class="stereo-label">Profundidad 3D</span>
+            <input type="range" class="stereo-slider" min="0" max="6" step="0.1" value="0">
+        </div>
+
         <button class="control-btn btn-fs">Pantalla Completa</button>
         <button class="control-btn btn-sbs">Modo SBS</button>
     </div>
@@ -136,72 +185,105 @@
         const viewerRight = document.querySelector('#viewer-right');
         const sbsButtons = document.querySelectorAll('.btn-sbs');
         const fsButtons = document.querySelectorAll('.btn-fs');
+        const stereoSliders = document.querySelectorAll('.stereo-slider');
 
-        // --- LÓGICA DE SINCRONIZACIÓN COMPLETA (Orbita + Zoom + Paneo) ---
-        const syncViewers = (source, target) => {
-            const orbit = source.getCameraOrbit();
+        // Variable global para guardar la separación actual (en grados)
+        let currentStereoGap = 0;
+
+        // --- FUNCIONES MATEMÁTICAS ---
+        
+        // Convertir Grados a Radianes
+        const degToRad = (deg) => deg * (Math.PI / 180);
+
+        // --- LOGICA DE SINCRONIZACIÓN CON EFECTO 3D ---
+        
+        // direction: 'LtoR' (Izquierda manda) o 'RtoL' (Derecha manda)
+        const syncViewers = (source, target, direction) => {
+            const orbit = source.getCameraOrbit(); // {theta, phi, radius} (theta está en radianes)
             const fieldOfView = source.getFieldOfView();
-            // NUEVO: Obtenemos el "Target" (hacia dónde mira la cámara, x,y,z) para el paneo
             const targetPos = source.getCameraTarget();
 
-            // Aplicamos rotación
-            target.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${orbit.radius}m`;
-            // Aplicamos zoom
+            // Calculamos el offset en radianes basado en el slider
+            const gapRad = degToRad(currentStereoGap);
+
+            // LOGICA MAESTRA 3D:
+            // Si movemos el visor Izquierdo, el Derecho debe estar a (Theta + 2*Gap)
+            // Si movemos el visor Derecho, el Izquierdo debe estar a (Theta - 2*Gap)
+            // Esto mantiene la separación relativa constante.
+            
+            let newTheta = orbit.theta;
+
+            if (direction === 'LtoR') {
+                // Soy la izq, la derecha debe ser YO + la separación total
+                newTheta = orbit.theta + (gapRad * 2); // *2 para simular separación desde el centro
+            } else {
+                // Soy la derecha, la izq debe ser YO - la separación total
+                newTheta = orbit.theta - (gapRad * 2);
+            }
+
+            // Aplicamos
+            target.cameraOrbit = `${newTheta}rad ${orbit.phi}rad ${orbit.radius}m`;
             target.fieldOfView = `${fieldOfView}deg`;
-            // Aplicamos paneo (NUEVO)
             target.cameraTarget = `${targetPos.x}m ${targetPos.y}m ${targetPos.z}m`;
             
-            // Forzamos actualización inmediata
             target.jumpCameraToGoal();
         };
 
-        // Escuchas de eventos (solo si es interacción humana)
+        // --- EVENTOS DE CÁMARA ---
         viewerLeft.addEventListener('camera-change', (event) => {
-            if (event.detail.source === 'user-interaction') syncViewers(viewerLeft, viewerRight);
+            if (event.detail.source === 'user-interaction') {
+                syncViewers(viewerLeft, viewerRight, 'LtoR');
+            }
         });
 
         viewerRight.addEventListener('camera-change', (event) => {
-            if (event.detail.source === 'user-interaction') syncViewers(viewerRight, viewerLeft);
+            if (event.detail.source === 'user-interaction') {
+                syncViewers(viewerRight, viewerLeft, 'RtoL');
+            }
         });
 
-        // --- LÓGICA DE BOTONES (UN SOLO USO) ---
+        // --- LÓGICA DEL SLIDER 3D ---
+        const updateStereoEffect = (value) => {
+            currentStereoGap = parseFloat(value);
+            
+            // Sincronizar visualmente ambos sliders
+            stereoSliders.forEach(slider => slider.value = currentStereoGap);
 
-        // Función para ocultar todos los botones de un tipo
-        const hideButtons = (nodeList) => {
-            nodeList.forEach(btn => {
-                btn.style.display = 'none';
-            });
+            // Forzar una actualización de las cámaras para aplicar el nuevo efecto
+            // Usamos la izquierda como referencia base
+            syncViewers(viewerLeft, viewerRight, 'LtoR');
         };
 
-        // Botones SBS
+        stereoSliders.forEach(slider => {
+            // Evento 'input' para tiempo real mientras deslizas
+            slider.addEventListener('input', (e) => {
+                updateStereoEffect(e.target.value);
+            });
+        });
+
+
+        // --- BOTONES ---
+        const hideButtons = (nodeList) => nodeList.forEach(btn => btn.style.display = 'none');
+
         sbsButtons.forEach(btn => {
             btn.addEventListener('click', () => {
-                // Activamos SBS
                 bodyElement.classList.add('sbs-active');
-                
-                // Sincronizamos inmediatamente
-                syncViewers(viewerLeft, viewerRight);
-
-                // Ocultamos TODOS los botones SBS (ya no se puede volver atrás)
+                // Al entrar, aseguramos sincronización inicial
+                syncViewers(viewerLeft, viewerRight, 'LtoR');
                 hideButtons(sbsButtons);
             });
         });
 
-        // Botones Pantalla Completa
         fsButtons.forEach(btn => {
             btn.addEventListener('click', () => {
-                // Activamos Fullscreen
                 if (!document.fullscreenElement) {
                     document.documentElement.requestFullscreen().catch(e => console.error(e));
                 }
-                
-                // Ocultamos TODOS los botones de Pantalla Completa
                 hideButtons(fsButtons);
             });
         });
 
-        // Sincronización inicial de carga
-        viewerLeft.addEventListener('load', () => syncViewers(viewerLeft, viewerRight));
+        viewerLeft.addEventListener('load', () => syncViewers(viewerLeft, viewerRight, 'LtoR'));
 
     </script>
 
