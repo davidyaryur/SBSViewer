@@ -1,16 +1,227 @@
-<div id="main-container">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor 3D GLB - Inmersivo (Iluminación Mejorada)</title>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: none; 
+        }
+
+        /* --- PANTALLA DE INICIO --- */
+        #landing-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.8s ease;
+        }
+        
+        #start-btn {
+            padding: 20px 40px;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 1px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 122, 204, 0.5);
+            transition: transform 0.2s, background-color 0.2s;
+            text-transform: uppercase;
+        }
+
+        #start-btn:hover {
+            transform: scale(1.05);
+            background-color: #0099ff;
+        }
+
+        /* --- MENÚ DE SELECCIÓN --- */
+        #menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1a1a1a;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #menu-screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        h1 { margin-bottom: 30px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; text-align: center; color: white;}
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 70vh;
+            overflow-y: auto;
+            width: 80%;
+            max-width: 400px;
+            padding-right: 10px;
+        }
+
+        .file-btn {
+            padding: 15px 20px;
+            background-color: #333;
+            border: 1px solid #444;
+            color: #ddd;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-btn:hover { background-color: #007acc; color: white; transform: translateX(5px); }
+        .file-btn span { font-size: 0.8em; opacity: 0.6; }
+
+        /* --- VISORES --- */
+        #main-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            opacity: 0; 
+            transition: opacity 1s ease;
+            position: absolute;
+            top: 0;
+            z-index: 1;
+        }
+        #main-container.visible { opacity: 1; }
+
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            background-color: #000; 
+            outline: none; 
+        }
+
+        /* --- LOGICA VISUAL SBS 3D --- */
+        body.sbs-active #viewer-left,
+        body.sbs-active #viewer-right {
+            width: 50%;
+            opacity: 1;
+            pointer-events: auto;
+            border: none; 
+        }
+
+        #viewer-right { width: 0; opacity: 0; pointer-events: none; }
+
+        /* --- HUD --- */
+        .hud-container {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            pointer-events: none; 
+            box-sizing: border-box;
+            transition: width 0.3s;
+            display: none; 
+            z-index: 500;
+        }
+        .hud-container.active { display: block; }
+
+        #hud-left { left: 0; width: 100%; }
+        #hud-right { left: 50%; width: 50%; display: none; }
+
+        body.sbs-active #hud-left { width: 50%; }
+        body.sbs-active #hud-right { display: block; }
+
+        /* --- BOTONES DE CONFIGURACIÓN --- */
+        .control-btn {
+            position: absolute;
+            bottom: 20px;
+            padding: 12px 20px;
+            background-color: rgba(51, 51, 51, 0.9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 100;
+        }
+        
+        .btn-sbs { right: 20px; }
+
+        /* --- ZONA TÁCTIL SUPERIOR --- */
+        .toggle-3d-btn {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;           
+            height: 150px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            pointer-events: none; 
+            z-index: 50;          
+            outline: none;
+        }
+
+        body.sbs-active .toggle-3d-btn { pointer-events: auto; }
+        .hidden { opacity: 0; pointer-events: none; }
+        .gone { display: none !important; }
+
+    </style>
+
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+</head>
+<body>
+
+    <div id="landing-screen">
+        <button id="start-btn">Entrar en Pantalla Completa</button>
+        <p style="color: #666; margin-top: 20px;">Experiencia Inmersiva WebXR</p>
+    </div>
+
+    <div id="menu-screen">
+        <h1>Seleccionar Modelo</h1>
+        <div class="file-list" id="file-list-container"></div>
+        <p style="margin-top:20px; font-size: 0.8em; color: #666;">Selecciona para cargar</p>
+    </div>
+
+    <div id="main-container">
         <model-viewer 
             id="viewer-left" 
             src="" 
             alt="Left" 
             camera-controls 
-            
             environment-image="neutral" 
             tone-mapping="commerce"
             shadow-intensity="1.5" 
             shadow-softness="0.8"
             exposure="1.2"
-            
             interaction-prompt="none">
         </model-viewer>
 
@@ -19,13 +230,193 @@
             src="" 
             alt="Right" 
             camera-controls 
-            
             environment-image="neutral"
             tone-mapping="commerce" 
             shadow-intensity="1.5" 
             shadow-softness="0.8"
             exposure="1.2"
-            
             interaction-prompt="none">
         </model-viewer>
     </div>
+
+    <div id="hud-left" class="hud-container">
+        <button class="toggle-3d-btn" title="Toca aquí para cambiar intensidad 3D"></button> 
+        <button class="control-btn btn-sbs">Modo SBS</button>
+    </div>
+
+    <div id="hud-right" class="hud-container">
+        <button class="toggle-3d-btn" title="Toca aquí para cambiar intensidad 3D"></button> 
+        <button class="control-btn btn-sbs">Modo SBS</button>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURACIÓN DE ARCHIVOS
+        // ==========================================
+        const assetFiles = [
+            "doritos.glb",
+            "natuchips.glb",
+            "iselitas.glb",
+            "kotex.glb",
+            "caledonia_clasico.glb",
+            "caledonia_mega.glb"
+        ];
+        // ==========================================
+
+        const landingScreen = document.getElementById('landing-screen');
+        const startBtn = document.getElementById('start-btn');
+        const menuScreen = document.getElementById('menu-screen');
+        const fileListContainer = document.getElementById('file-list-container');
+        const mainContainer = document.getElementById('main-container');
+        const hudLeft = document.getElementById('hud-left');
+        const hudRight = document.getElementById('hud-right');
+        const viewerLeft = document.querySelector('#viewer-left');
+        const viewerRight = document.querySelector('#viewer-right');
+
+        // INICIO
+        startBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(e => console.log("FS bloqueado"));
+            }
+            landingScreen.classList.add('hidden');
+            setTimeout(() => {
+                landingScreen.classList.add('gone'); 
+                menuScreen.classList.add('active'); 
+            }, 800);
+        });
+
+        // GENERAR MENÚ
+        assetFiles.forEach(fileName => {
+            const btn = document.createElement('button');
+            btn.className = 'file-btn';
+            const displayName = fileName.replace('.glb', '').replace(/_/g, ' ').toUpperCase();
+            btn.innerHTML = `${displayName} <span>GLB</span>`;
+            btn.onclick = () => loadSelectedModel(fileName);
+            fileListContainer.appendChild(btn);
+        });
+
+        function loadSelectedModel(fileName) {
+            const fullPath = fileName; 
+            
+            viewerLeft.src = fullPath;
+            viewerRight.src = fullPath;
+
+            menuScreen.classList.remove('active');
+            menuScreen.classList.add('hidden');
+            
+            setTimeout(() => {
+                mainContainer.classList.add('visible');
+                hudLeft.classList.add('active');
+                hudRight.classList.add('active');
+            }, 300);
+
+            setTimeout(() => syncViewers(viewerLeft, viewerRight, 'LtoR'), 500);
+        }
+
+        // LÓGICA VISOR
+        const bodyElement = document.body;
+        const sbsButtons = document.querySelectorAll('.btn-sbs');
+        const toggle3dButtons = document.querySelectorAll('.toggle-3d-btn');
+
+        let currentStereoGap = 0;
+        
+        // --- Variables para el ciclo de profundidad ---
+        const depthLevels = [0, 3, 6, 9]; 
+        let currentLevelIndex = 0; 
+        // ----------------------------------------------
+
+        const degToRad = (deg) => deg * (Math.PI / 180);
+
+        const syncViewers = (source, target, direction) => {
+            const orbit = source.getCameraOrbit(); 
+            const fieldOfView = source.getFieldOfView();
+            const targetPos = source.getCameraTarget();
+            const gapRad = degToRad(currentStereoGap);
+
+            let newTheta = orbit.theta;
+            if (direction === 'LtoR') {
+                newTheta = orbit.theta - gapRad; 
+            } else {
+                newTheta = orbit.theta + gapRad;
+            }
+
+            target.cameraOrbit = `${newTheta}rad ${orbit.phi}rad ${orbit.radius}m`;
+            target.fieldOfView = `${fieldOfView}deg`;
+            target.cameraTarget = `${targetPos.x}m ${targetPos.y}m ${targetPos.z}m`;
+            target.jumpCameraToGoal();
+        };
+
+        viewerLeft.addEventListener('camera-change', (event) => {
+            if (event.detail.source === 'user-interaction') syncViewers(viewerLeft, viewerRight, 'LtoR');
+        });
+        viewerRight.addEventListener('camera-change', (event) => {
+            if (event.detail.source === 'user-interaction') syncViewers(viewerRight, viewerLeft, 'RtoL');
+        });
+
+        function animateGapChange(startGap, endGap, duration) {
+            const startTime = performance.now();
+            const currentLeftOrbit = viewerLeft.getCameraOrbit();
+            const currentOrbitData = {
+                phi: currentLeftOrbit.phi,
+                radius: currentLeftOrbit.radius,
+                target: viewerLeft.getCameraTarget(),
+                fov: viewerLeft.getFieldOfView()
+            };
+            const centerTheta = currentLeftOrbit.theta - degToRad(startGap / 2);
+
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+                currentStereoGap = startGap + (endGap - startGap) * ease;
+                const halfGapRad = degToRad(currentStereoGap / 2);
+                
+                const leftTheta = centerTheta + halfGapRad;
+                const rightTheta = centerTheta - halfGapRad;
+
+                viewerLeft.cameraOrbit = `${leftTheta}rad ${currentOrbitData.phi}rad ${currentOrbitData.radius}m`;
+                viewerRight.cameraOrbit = `${rightTheta}rad ${currentOrbitData.phi}rad ${currentOrbitData.radius}m`;
+                
+                const camString = `${currentOrbitData.target.x}m ${currentOrbitData.target.y}m ${currentOrbitData.target.z}m`;
+                const fovString = `${currentOrbitData.fov}deg`;
+
+                viewerLeft.cameraTarget = camString;
+                viewerRight.cameraTarget = camString;
+                viewerLeft.fieldOfView = fovString;
+                viewerRight.fieldOfView = fovString;
+
+                viewerLeft.jumpCameraToGoal();
+                viewerRight.jumpCameraToGoal();
+
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            requestAnimationFrame(update);
+        }
+
+        // --- Lógica del botón fantasma para ciclar 0 -> 3 -> 6 -> 9 -> 0 ---
+        toggle3dButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const nextLevelIndex = (currentLevelIndex + 1) % depthLevels.length;
+                const startGap = depthLevels[currentLevelIndex];
+                const endGap = depthLevels[nextLevelIndex];
+
+                animateGapChange(startGap, endGap, 1000);
+
+                currentLevelIndex = nextLevelIndex;
+                console.log(`Profundidad cambiada a: ${endGap} grados`);
+            });
+        });
+
+        sbsButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                bodyElement.classList.add('sbs-active');
+                syncViewers(viewerLeft, viewerRight, 'LtoR');
+                sbsButtons.forEach(b => b.style.display = 'none');
+            });
+        });
+
+        viewerLeft.addEventListener('load', () => syncViewers(viewerLeft, viewerRight, 'LtoR'));
+    </script>
+</body>
+</html>
