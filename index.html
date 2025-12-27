@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor 3D GLB - Inmersivo (Iluminación Mejorada)</title>
+    <title>Visor 3D GLB - Modo Dramático</title>
     
     <style>
         body {
@@ -217,11 +217,14 @@
             src="" 
             alt="Left" 
             camera-controls 
-            environment-image="neutral" 
-            tone-mapping="commerce"
-            shadow-intensity="1.5" 
-            shadow-softness="0.8"
-            exposure="1.2"
+            
+            environment-image="neutral"
+            environment-intensity="0.4"
+            shadow-intensity="2" 
+            shadow-softness="0.2"
+            exposure="0.5"
+            tone-mapping="aces"
+
             interaction-prompt="none">
         </model-viewer>
 
@@ -230,11 +233,14 @@
             src="" 
             alt="Right" 
             camera-controls 
+            
             environment-image="neutral"
-            tone-mapping="commerce" 
-            shadow-intensity="1.5" 
-            shadow-softness="0.8"
-            exposure="1.2"
+            environment-intensity="0.4" 
+            shadow-intensity="2" 
+            shadow-softness="0.2"
+            exposure="0.5"
+            tone-mapping="aces"
+
             interaction-prompt="none">
         </model-viewer>
     </div>
