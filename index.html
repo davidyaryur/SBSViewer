@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor 3D GLB - Sincronización Perfecta</title>
+    <title>Visor 3D GLB - UI Duplicada SBS</title>
     
     <style>
         body {
@@ -35,7 +35,7 @@
             pointer-events: none;
         }
 
-        /* MODO SBS ACTIVO */
+        /* --- LOGICA VISUAL SBS 3D --- */
         body.sbs-active #viewer-left,
         body.sbs-active #viewer-right {
             width: 50%;
@@ -43,24 +43,75 @@
             pointer-events: auto;
             border-right: 1px solid #333;
         }
-        
-        #sbs-btn {
-            position: fixed;
+
+        /* --- CAPAS DE INTERFAZ (HUD) --- */
+        .hud-container {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            pointer-events: none; /* Dejar pasar clics al modelo 3D */
+            box-sizing: border-box;
+            transition: width 0.3s;
+        }
+
+        /* HUD Izquierdo (Default ocupa todo) */
+        #hud-left {
+            left: 0;
+            width: 100%;
+            border-right: none; 
+        }
+
+        /* HUD Derecho (Oculto por defecto) */
+        #hud-right {
+            left: 50%;
+            width: 50%;
+            display: none; /* Oculto inicialmente */
+        }
+
+        /* Cuando SBS está activo */
+        body.sbs-active #hud-left {
+            width: 50%;
+            border-right: 1px solid rgba(0,0,0,0.1);
+        }
+        body.sbs-active #hud-right {
+            display: block;
+        }
+
+        /* --- BOTONES --- */
+        .control-btn {
+            position: absolute;
             bottom: 20px;
-            right: 20px;
-            padding: 12px 18px;
-            background-color: #333;
+            padding: 10px 16px; /* Un poco más pequeños para que quepan bien en mitades */
+            background-color: rgba(51, 51, 51, 0.9);
             color: white;
             border: none;
             border-radius: 8px;
             font-weight: bold;
+            font-size: 14px;
             cursor: pointer;
-            z-index: 10;
+            pointer-events: auto; /* Reactivar clics en botones */
+            transition: background-color 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            white-space: nowrap;
         }
 
-        body.sbs-active #sbs-btn {
+        .control-btn:hover {
+            background-color: #555;
+        }
+        
+        /* Estilo activo para botones SBS */
+        .btn-sbs.active {
              background-color: #007bff;
         }
+
+        /* Posiciones relativas a su contenedor HUD */
+        .btn-fs {
+            left: 20px;
+        }
+        .btn-sbs {
+            right: 20px;
+        }
+
     </style>
 
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
@@ -89,56 +140,82 @@
         </model-viewer>
     </div>
 
-    <button id="sbs-btn">SBS Mode</button>
+    <div id="hud-left" class="hud-container">
+        <button class="control-btn btn-fs">Pantalla</button>
+        <button class="control-btn btn-sbs">Modo SBS</button>
+    </div>
+
+    <div id="hud-right" class="hud-container">
+        <button class="control-btn btn-fs">Pantalla</button>
+        <button class="control-btn btn-sbs">Modo SBS</button>
+    </div>
 
     <script>
-        const sbsButton = document.getElementById('sbs-btn');
         const bodyElement = document.body;
         const viewerLeft = document.querySelector('#viewer-left');
         const viewerRight = document.querySelector('#viewer-right');
 
-        // Función para copiar posición sin causar bucles
+        // Seleccionamos TODOS los botones por clase, ya que ahora hay duplicados
+        const sbsButtons = document.querySelectorAll('.btn-sbs');
+        const fsButtons = document.querySelectorAll('.btn-fs');
+
+        // --- LÓGICA SINCRONIZACIÓN 3D ---
         const syncViewers = (source, target) => {
-            // Obtenemos la órbita y el campo de visión actuales del origen
             const orbit = source.getCameraOrbit();
             const fieldOfView = source.getFieldOfView();
-
-            // Los aplicamos al destino
-            // Usamos las propiedades directas en lugar de atributos para mayor precisión
             target.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${orbit.radius}m`;
             target.fieldOfView = `${fieldOfView}deg`;
-            
-            // Forzamos el salto instantáneo para que no haya retraso visual
             target.jumpCameraToGoal();
         };
 
-        // EVENTO IZQUIERDO
         viewerLeft.addEventListener('camera-change', (event) => {
-            // EL SECRETO: Solo sincronizamos si es interacción de USUARIO
-            if (event.detail.source === 'user-interaction') {
-                syncViewers(viewerLeft, viewerRight);
-            }
+            if (event.detail.source === 'user-interaction') syncViewers(viewerLeft, viewerRight);
         });
 
-        // EVENTO DERECHO
         viewerRight.addEventListener('camera-change', (event) => {
-            // EL SECRETO: Solo sincronizamos si es interacción de USUARIO
-            if (event.detail.source === 'user-interaction') {
-                syncViewers(viewerRight, viewerLeft);
-            }
+            if (event.detail.source === 'user-interaction') syncViewers(viewerRight, viewerLeft);
         });
 
-        // Botón SBS
-        sbsButton.addEventListener('click', () => {
-            bodyElement.classList.toggle('sbs-active');
-            if (bodyElement.classList.contains('sbs-active')) {
-                sbsButton.textContent = 'Exit SBS';
-                // Al activar, igualamos la derecha a la izquierda
-                syncViewers(viewerLeft, viewerRight);
-            } else {
-                sbsButton.textContent = 'SBS Mode';
-            }
+        // --- LÓGICA SBS (Aplica a todos los botones SBS) ---
+        sbsButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                bodyElement.classList.toggle('sbs-active');
+                const isActive = bodyElement.classList.contains('sbs-active');
+
+                // Sincronizar al activar
+                if (isActive) syncViewers(viewerLeft, viewerRight);
+
+                // Actualizar TEXTO y ESTILO de AMBOS botones SBS
+                sbsButtons.forEach(b => {
+                    b.textContent = isActive ? 'Salir SBS' : 'Modo SBS';
+                    b.classList.toggle('active', isActive);
+                });
+            });
         });
+
+        // --- LÓGICA PANTALLA COMPLETA (Aplica a todos los botones FS) ---
+        const toggleFullscreen = () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(e => console.error(e));
+            } else {
+                document.exitFullscreen();
+            }
+        };
+
+        fsButtons.forEach(btn => {
+            btn.addEventListener('click', toggleFullscreen);
+        });
+
+        // Detectar cambios globales de pantalla completa para actualizar textos
+        document.addEventListener('fullscreenchange', () => {
+            const isFull = !!document.fullscreenElement;
+            fsButtons.forEach(b => {
+                b.textContent = isFull ? 'Salir Pantalla' : 'Pantalla';
+            });
+        });
+
+        // Sincronización inicial al cargar
+        viewerLeft.addEventListener('load', () => syncViewers(viewerLeft, viewerRight));
         
     </script>
 
